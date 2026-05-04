@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mandelbrot Explorer</title>
+    <style>
+        body { background: #000; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
+        canvas { border: 1px solid #333; box-shadow: 0 0 20px rgba(0,0,0,0.5); cursor: zoom-in; }
+        .controls { position: absolute; top: 20px; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 8px; pointer-events: none; }
+    </style>
+</head>
+<body>
+    <div class="controls">Click to Zoom In</div>
+    <canvas id="mandelCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('mandelCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Initial view bounds
+        let width = window.innerWidth;
+        let height = window.innerHeight;
+        canvas.width = width;
+        canvas.height = height;
+
+        let minRe = -2.0, maxRe = 1.0;
+        let minIm = -1.2, maxIm = 1.2;
+        let maxIterations = 200;
+
+        function draw() {
+            const imgData = ctx.createImageData(width, height);
+            
+            for (let x = 0; x < width; x++) {
+                for (let y = 0; y < height; y++) {
+                    // Map pixel to complex plane
+                    let cr = minRe + (x / width) * (maxRe - minRe);
+                    let ci = minIm + (y / height) * (maxIm - minIm);
+                    
+                    let re = 0, im = 0;
+                    let n = 0;
+
+                    while (re * re + im * im <= 4 && n < maxIterations) {
+                        let nextRe = re * re - im * im + cr;
+                        im = 2 * re * im + ci;
+                        re = nextRe;
+                        n++;
+                    }
+
+                    const pix = (x + y * width) * 4;
+                    if (n === maxIterations) {
+                        imgData.data[pix] = imgData.data[pix+1] = imgData.data[pix+2] = 0;
+                    } else {
+                        // Simple color cycling
+                        let color = (n * 5) % 360;
+                        let rgb = hsvToRgb(color / 360, 1, 1);
+                        imgData.data[pix] = rgb[0];
+                        imgData.data[pix+1] = rgb[1];
+                        imgData.data[pix+2] = rgb[2];
+                    }
+                    imgData.data[pix+3] = 255;
+                }
+            }
+            ctx.putImageData(imgData, 0, 0);
+        }
+
+        // Zoom Logic
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            // Find the point in the complex plane that was clicked
+            const clickRe = minRe + (mouseX / width) * (maxRe - minRe);
+            const clickIm = minIm + (mouseY / height) * (maxIm - minIm);
+
+            // Calculate new range (Zoom factor 5x)
+            const reRange = (maxRe - minRe) / 5;
+            const imRange = (maxIm - minIm) / 5;
+
+            minRe = clickRe - reRange / 2;
+            maxRe = clickRe + reRange / 2;
+            minIm = clickIm - imRange / 2;
+            maxIm = clickIm + imRange / 2;
+
+            // Increase detail as we zoom
+            maxIterations += 50;
+            draw();
+        });
+
+        // Helper: HSV to RGB for pretty colors
+        function hsvToRgb(h, s, v) {
+            let r, g, b, i = Math.floor(h * 6), f = h * 6 - i, p = v * (1 - s), q = v * (1 - f * s), t = v * (1 - (1 - f) * s);
+            switch (i % 6) {
+                case 0: r = v, g = t, b = p; break;
+                case 1: r = q, g = v, b = p; break;
+                case 2: r = p, g = v, b = t; break;
+                case 3: r = p, g = q, b = v; break;
+                case 4: r = t, g = p, b = v; break;
+                case 5: r = v, g = p, b = q; break;
+            }
+            return [r * 255, g * 255, b * 255];
+        }
+
+        window.onresize = () => {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            draw();
+        };
+
+        draw();
+    </script>
+</body>
+</html>
